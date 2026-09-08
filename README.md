@@ -6,35 +6,35 @@ An MCP server that lets ChatGPT act as a controlled SMS agent using your existin
 
 Business goal → ChatGPT/Manager Agent → rules → campaign plan → user approval → httpSMS → Android SIM → recipient → reply → classification → follow-up status
 
-## Concrete example: EPF follow-up agent
+## Concrete example: data-fill follow-up agent
 
 ### Goal
 
-> Get July EPF details from all pending offices by 5:00 PM today.
+> Get the required monthly data filled by all pending offices by 5:00 PM today.
 
 ### 1. Agent plans
 
-The agent reads the contact/status master, identifies only pending offices, chooses the approved EPF reminder text, and creates a campaign plan.
+The agent reads the contact/status master, identifies only offices where the required data is still not filled, selects the approved reminder text, and creates a campaign plan.
 
-Example pending offices:
+Example fictional office names:
 
-- Dholka
-- Mandal
-- Borsad ANA
-- Kathana
-- Undel
-- Sayala SDA
-- Wadhwan SDA
+- Sunrise Office
+- Greenfield Unit
+- Riverpark Centre
+- Hillview Office
+- Lakewood Unit
+- Silverline Centre
+- Meadowpoint Office
 
 Example SMS:
 
-> Kindly submit July 2026 EPF details by 5:00 PM today. If EPF is not applicable or demand is NIL, please confirm the same.
+> Kindly fill the required monthly data in the shared form/sheet by 5:00 PM today. If there is no data to report, please confirm NIL.
 
 ### 2. Rules check
 
 Before sending, the rule engine verifies:
 
-- do not message offices already marked complete
+- do not message offices where data is already filled
 - do not send the same reminder to the same number inside the configured repeat window
 - use only configured contact numbers
 - stay within the maximum campaign size
@@ -46,7 +46,7 @@ The agent should present the exact recipients and exact message before sending.
 
 Example:
 
-> 7 offices are pending. Send this approved EPF reminder to all 7?
+> 7 offices still have data pending. Send this approved reminder to all 7?
 
 Only after the user explicitly approves should `send_campaign` be called with confirmation enabled.
 
@@ -62,10 +62,10 @@ Each send result is stored in campaign state.
 
 Example replies:
 
-- Dholka: `Submitted`
-- Mandal: `No EPF this month`
-- Kathana: `Will send by 4 PM`
-- Undel: no reply
+- Sunrise Office: `Data filled`
+- Greenfield Unit: `No data this month`
+- Riverpark Centre: `Will fill by 4 PM`
+- Hillview Office: no reply
 
 Replies can be recorded through `record_reply` or through the incoming SMS webhook endpoint.
 
@@ -73,30 +73,30 @@ Replies can be recorded through `record_reply` or through the incoming SMS webho
 
 The reply agent converts free-text replies into business status:
 
-- `Submitted` → `completed`
-- `No EPF this month` → `no_data`
-- `Need format / please help` → `need_help`
-- unclear or future promise → `unknown`
+- `Data filled` → `completed`
+- `No data this month` → `no_data`
+- `Need link / please help` → `need_help`
+- unclear response or future promise → `unknown`
 
 ### 7. Identify pending follow-up
 
-The agent checks campaign state again instead of blindly resending to everyone.
+The agent checks the actual data-fill status again instead of blindly resending to everyone.
 
 Example result:
 
 - 5 offices completed
-- Kathana still pending / promised
-- Undel still pending / no response
+- Riverpark Centre still pending / promised
+- Hillview Office still pending / no response
 
-Only Kathana and Undel should appear in the next follow-up list.
+Only Riverpark Centre and Hillview Office should appear in the next follow-up list.
 
 ### Why this is agentic
 
 The business goal is **not** "send 7 SMS".
 
-The business goal is **"complete EPF collection from every required office"**.
+The business goal is **"get the required data filled by every required office"**.
 
-The agent therefore plans, checks rules, requests approval, acts, observes replies, updates state, and decides what still needs attention.
+The agent therefore plans, checks rules, requests approval, acts, observes replies, verifies completion, updates state, and decides what still needs attention.
 
 ## MCP tools
 
