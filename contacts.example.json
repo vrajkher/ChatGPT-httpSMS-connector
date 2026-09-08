@@ -1,0 +1,14 @@
+[
+  {
+    "id": "office-dholka",
+    "name": "CHC Dholka",
+    "phone": "+91XXXXXXXXXX",
+    "tags": ["office", "chc"]
+  },
+  {
+    "id": "office-mandal",
+    "name": "CHC Mandal",
+    "phone": "+91XXXXXXXXXX",
+    "tags": ["office", "chc"]
+  }
+]
