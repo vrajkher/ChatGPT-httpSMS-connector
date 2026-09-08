@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "maxBulkRecipients": 25,
+  "minimumRepeatHours": 4,
+  "requireConfirmationForSend": true,
+  "requireConfirmationForBulk": true,
+  "defaultFollowUpHours": 24,
+  "replyClasses": {
+    "completed": ["submitted", "done", "completed", "sent", "uploaded"],
+    "no_data": ["no data", "nil", "zero", "not applicable", "n/a"],
+    "need_help": ["help", "error", "issue", "problem", "unable", "failed"]
+  }
+}
