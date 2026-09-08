@@ -6,6 +6,98 @@ An MCP server that lets ChatGPT act as a controlled SMS agent using your existin
 
 Business goal → ChatGPT/Manager Agent → rules → campaign plan → user approval → httpSMS → Android SIM → recipient → reply → classification → follow-up status
 
+## Concrete example: EPF follow-up agent
+
+### Goal
+
+> Get July EPF details from all pending offices by 5:00 PM today.
+
+### 1. Agent plans
+
+The agent reads the contact/status master, identifies only pending offices, chooses the approved EPF reminder text, and creates a campaign plan.
+
+Example pending offices:
+
+- Dholka
+- Mandal
+- Borsad ANA
+- Kathana
+- Undel
+- Sayala SDA
+- Wadhwan SDA
+
+Example SMS:
+
+> Kindly submit July 2026 EPF details by 5:00 PM today. If EPF is not applicable or demand is NIL, please confirm the same.
+
+### 2. Rules check
+
+Before sending, the rule engine verifies:
+
+- do not message offices already marked complete
+- do not send the same reminder to the same number inside the configured repeat window
+- use only configured contact numbers
+- stay within the maximum campaign size
+- require explicit user approval before real bulk sending
+
+### 3. User approval
+
+The agent should present the exact recipients and exact message before sending.
+
+Example:
+
+> 7 offices are pending. Send this approved EPF reminder to all 7?
+
+Only after the user explicitly approves should `send_campaign` be called with confirmation enabled.
+
+### 4. Send
+
+The connector sends the approved messages through:
+
+ChatGPT → MCP connector → httpSMS API → Android phone → SIM → recipient
+
+Each send result is stored in campaign state.
+
+### 5. Record replies
+
+Example replies:
+
+- Dholka: `Submitted`
+- Mandal: `No EPF this month`
+- Kathana: `Will send by 4 PM`
+- Undel: no reply
+
+Replies can be recorded through `record_reply` or through the incoming SMS webhook endpoint.
+
+### 6. Classify
+
+The reply agent converts free-text replies into business status:
+
+- `Submitted` → `completed`
+- `No EPF this month` → `no_data`
+- `Need format / please help` → `need_help`
+- unclear or future promise → `unknown`
+
+### 7. Identify pending follow-up
+
+The agent checks campaign state again instead of blindly resending to everyone.
+
+Example result:
+
+- 5 offices completed
+- Kathana still pending / promised
+- Undel still pending / no response
+
+Only Kathana and Undel should appear in the next follow-up list.
+
+### Why this is agentic
+
+The business goal is **not** "send 7 SMS".
+
+The business goal is **"complete EPF collection from every required office"**.
+
+The agent therefore plans, checks rules, requests approval, acts, observes replies, updates state, and decides what still needs attention.
+
 ## MCP tools
 
 - `list_contacts` — read the configured office/contact master.
