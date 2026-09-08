@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: chatgpt-httpsms-connector
+    runtime: docker
+    healthCheckPath: /health
+    envVars:
+      - key: HTTPSMS_API_KEY
+        sync: false
+      - key: HTTPSMS_FROM
+        sync: false
+      - key: HTTPSMS_BASE_URL
+        value: https://api.httpsms.com
