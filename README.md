@@ -1,160 +1,71 @@
-# Agentic ChatGPT ↔ httpSMS Connector
+# Agentic ChatGPT ↔ SMS Gateway for Android Connector
 
-An MCP server that lets ChatGPT act as a controlled SMS agent using your existing httpSMS/httpsms Android setup.
+This MCP server lets ChatGPT act as a controlled SMS agent using **SMS Gateway for Android** and the SIM in your Android phone.
 
-## Agentic flow
+## Final flow
 
-Business goal → ChatGPT/Manager Agent → rules → campaign plan → user approval → httpSMS → Android SIM → recipient → reply → classification → follow-up status
+ChatGPT → MCP connector → SMS Gateway API → Android phone → SIM → recipient → reply/webhook → classification → follow-up.
 
-## Concrete example: data-fill follow-up agent
+## What changed
 
-### Goal
+This branch replaces the old httpSMS-specific sending layer with the open-source `capcom6/android-sms-gateway` API.
 
-> Get the required monthly data filled by all pending offices by 5:00 PM today.
+Default cloud endpoint:
 
-### 1. Agent plans
+```text
+https://api.sms-gate.app/3rdparty/v1/message
+```
 
-The agent reads the contact/status master, identifies only offices where the required data is still not filled, selects the approved reminder text, and creates a campaign plan.
+Local/LAN mode is also supported by setting `SMSGATE_BASE_URL`, for example:
 
-Example fictional office names:
+```text
+http://192.168.1.123:8080
+```
 
-- Sunrise Office
-- Greenfield Unit
-- Riverpark Centre
-- Hillview Office
-- Lakewood Unit
-- Silverline Centre
-- Meadowpoint Office
-
-Example SMS:
-
-> Kindly fill the required monthly data in the shared form/sheet by 5:00 PM today. If there is no data to report, please confirm NIL.
-
-### 2. Rules check
-
-Before sending, the rule engine verifies:
-
-- do not message offices where data is already filled
-- do not send the same reminder to the same number inside the configured repeat window
-- use only configured contact numbers
-- stay within the maximum campaign size
-- require explicit user approval before real bulk sending
-
-### 3. User approval
-
-The agent should present the exact recipients and exact message before sending.
-
-Example:
-
-> 7 offices still have data pending. Send this approved reminder to all 7?
-
-Only after the user explicitly approves should `send_campaign` be called with confirmation enabled.
-
-### 4. Send
-
-The connector sends the approved messages through:
-
-ChatGPT → MCP connector → httpSMS API → Android phone → SIM → recipient
-
-Each send result is stored in campaign state.
-
-### 5. Record replies
-
-Example replies:
-
-- Sunrise Office: `Data filled`
-- Greenfield Unit: `No data this month`
-- Riverpark Centre: `Will fill by 4 PM`
-- Hillview Office: no reply
-
-Replies can be recorded through `record_reply` or through the incoming SMS webhook endpoint.
-
-### 6. Classify
-
-The reply agent converts free-text replies into business status:
-
-- `Data filled` → `completed`
-- `No data this month` → `no_data`
-- `Need link / please help` → `need_help`
-- unclear response or future promise → `unknown`
-
-### 7. Identify pending follow-up
-
-The agent checks the actual data-fill status again instead of blindly resending to everyone.
-
-Example result:
-
-- 5 offices completed
-- Riverpark Centre still pending / promised
-- Hillview Office still pending / no response
-
-Only Riverpark Centre and Hillview Office should appear in the next follow-up list.
-
-### Why this is agentic
-
-The business goal is **not** "send 7 SMS".
-
-The business goal is **"get the required data filled by every required office"**.
-
-The agent therefore plans, checks rules, requests approval, acts, observes replies, verifies completion, updates state, and decides what still needs attention.
+Both modes use the username/password shown by the Android app. Keep those credentials private.
 
 ## MCP tools
 
-- `list_contacts` — read the configured office/contact master.
+- `list_contacts` — read configured contacts.
 - `preview_sms` — preview one SMS without sending.
-- `plan_sms_campaign` — convert a goal + recipients + message into a stored campaign plan.
-- `send_sms` — send one real SMS after explicit confirmation.
-- `send_campaign` — execute an approved campaign while enforcing bulk/repeat rules.
-- `record_reply` — record and classify a reply as `completed`, `no_data`, `need_help`, or `unknown`.
-- `get_agent_status` — show campaign state, replies, and follow-ups that are due.
+- `send_sms` — send one SMS after explicit confirmation.
+- `plan_sms_campaign` — create a campaign plan without sending.
+- `send_campaign` — execute an approved campaign with repeat/bulk rules.
+- `record_reply` — record and classify a reply.
+- `get_agent_status` — show campaigns, replies and pending follow-ups.
 
-## Rule engine
+## Safety/rules
 
-Rules are stored in `agent-rules.json`.
+Rules are in `agent-rules.json`.
 
-Current defaults:
+Current behavior includes explicit confirmation before real sends, repeat-window protection and campaign-size limits. Do not use this gateway for unsolicited or high-volume bulk messaging; mobile operators may restrict such use.
 
-- max 25 recipients per campaign
-- no repeat message to the same number within 4 hours
-- explicit confirmation required before real sending
-- default follow-up check after 24 hours
-- deterministic reply classification for common completion/no-data/help phrases
+## Android setup
 
-## Contact master
+1. Install SMS Gateway for Android.
+2. Grant `SEND_SMS` permission.
+3. For cloud mode, enable **Cloud Server** and keep the service Online.
+4. Copy the Cloud Server username/password into your deployment environment — never into source code or GitHub.
+5. For local mode, enable **Local Server** and point `SMSGATE_BASE_URL` to the phone IP and port 8080.
 
-`contacts.example.json` shows the format. For real use, create a private `contacts.json` file or mount one at deploy time and set:
-
-```env
-CONTACTS_FILE=./contacts.json
-```
-
-Do not commit confidential contact data to a public repository.
-
-## Requirements
-
-- Working httpSMS Android setup
-- Node.js 20+
-- httpSMS API key
-- Your phone/SIM number registered in httpSMS
-
-## Install
+## Install connector
 
 ```bash
 npm install
 ```
 
-## Environment variables
+Create `.env` from `.env.example` and set:
 
 ```env
-HTTPSMS_API_KEY=your_real_key
-HTTPSMS_FROM=+91XXXXXXXXXX
-HTTPSMS_BASE_URL=https://api.httpsms.com
+SMSGATE_USERNAME=your_gateway_username
+SMSGATE_PASSWORD=your_gateway_password
+SMSGATE_BASE_URL=https://api.sms-gate.app/3rdparty/v1
 PORT=3000
-CONNECTOR_BEARER_TOKEN=long_random_secret
-HTTPSMS_WEBHOOK_TOKEN=another_random_secret
+CONNECTOR_BEARER_TOKEN=use_a_long_random_secret
+SMSGATE_WEBHOOK_TOKEN=use_another_random_secret
 ```
 
-Never commit the real secrets.
+Do not commit `.env`.
 
 ## Run
 
@@ -174,38 +85,34 @@ MCP endpoint:
 http://localhost:3000/mcp
 ```
 
-## Security
-
-Before public deployment, set `CONNECTOR_BEARER_TOKEN`. `/mcp` will then require:
+If `CONNECTOR_BEARER_TOKEN` is set, MCP requests require:
 
 ```text
 Authorization: Bearer <your secret>
 ```
 
-Incoming webhook processing is disabled unless `HTTPSMS_WEBHOOK_TOKEN` is set. When enabled, `/webhooks/httpsms` requires:
+## First single-SMS test
+
+Use the MCP tool `send_sms` with an E.164 number, message text and `confirmed=true` only after the exact recipient/message have been approved.
+
+Example business instruction:
 
 ```text
-x-webhook-token: <your webhook secret>
+Send “How r u” to +919726399693.
 ```
 
-Keep user approval enabled for external or bulk messages until your rules and contacts are tested.
+The connector converts a plain 10-digit Indian number to `+91...` automatically.
 
-## Incoming SMS
+## Incoming replies
 
-The connector includes `/webhooks/httpsms` as the agent-side receiver. You still need to configure the exact httpSMS webhook payload/secret arrangement in your httpSMS account. The handler accepts common fields such as `from`, `sender`, `phone` and `content`, `message`, or `text`.
+Webhook receiver:
 
-## Important limitation of this MVP
+```text
+POST /webhooks/smsgateway
+```
 
-Campaigns, replies, and send history are currently kept in process memory. A server restart clears this state. For production, replace this with Redis/PostgreSQL/ERPNext storage before relying on autonomous follow-up.
+Protect it with `SMSGATE_WEBHOOK_TOKEN`. Incoming received-message events are recorded and classified for agent follow-up.
 
-## httpSMS API
+## Production note
 
-Real sending uses:
-
-`POST https://api.httpsms.com/v1/messages/send`
-
-with `x-api-key` authentication and `content`, `from`, and `to` in the request body.
-
-## Next production upgrade
-
-Recommended next step: persistent state + official incoming-message integration + delivery-status polling/webhooks + ERPNext tools. That changes this from an agentic SMS MVP into a closed-loop business agent.
+Campaigns, replies and send history are still kept in process memory. A restart clears them. Before autonomous production use, persist state in PostgreSQL/Redis/ERPNext and configure the official SMS Gateway webhook to this connector.
