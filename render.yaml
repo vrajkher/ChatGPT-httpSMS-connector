@@ -1,12 +1,16 @@
 services:
   - type: web
-    name: chatgpt-httpsms-connector
+    name: chatgpt-android-sms-connector
     runtime: docker
     healthCheckPath: /health
     envVars:
-      - key: HTTPSMS_API_KEY
+      - key: SMSGATE_USERNAME
         sync: false
-      - key: HTTPSMS_FROM
+      - key: SMSGATE_PASSWORD
         sync: false
-      - key: HTTPSMS_BASE_URL
-        value: https://api.httpsms.com
+      - key: SMSGATE_BASE_URL
+        value: https://api.sms-gate.app/3rdparty/v1
+      - key: CONNECTOR_BEARER_TOKEN
+        sync: false
+      - key: SMSGATE_WEBHOOK_TOKEN
+        sync: false
